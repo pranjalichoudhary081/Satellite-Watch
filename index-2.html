@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Satellite Watch — The Aral Sea</title>
+  <meta name="description" content="An interactive NASA satellite story tracking the shrinking Aral Sea with real MODIS imagery delivered through NASA GIBS." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --ink:#111827; --muted:#667085; --paper:#f5f7fb; --card:#ffffff; --line:#e6e9ef;
+      --navy:#0e1b2b; --cyan:#1ea7a1; --cyan-2:#0f766e; --amber:#f0a44b; --red:#d85c5c;
+      --shadow:0 18px 60px rgba(15,23,42,.10);
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;background:var(--paper);color:var(--ink);font-family:"DM Sans",system-ui,sans-serif;line-height:1.55}
+    a{color:inherit}
+    .wrap{max-width:1180px;margin:0 auto;padding:0 24px}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;max-width:1240px;margin:0 auto}
+    .brand{display:flex;gap:12px;align-items:center;text-decoration:none;font-weight:700;letter-spacing:.02em}
+    .brand-dot{width:12px;height:12px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 6px rgba(30,167,161,.12)}
+    .nav-tag{font-size:12px;color:#475467;border:1px solid #d8dde7;background:#fff;padding:7px 11px;border-radius:999px}
+    .hero{padding:64px 0 38px;background:linear-gradient(180deg,#fbfcfe 0,#f5f7fb 100%)}
+    .kicker{font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan-2);margin-bottom:14px}
+    h1,h2,h3{font-family:"Space Grotesk",system-ui,sans-serif;line-height:1.08;margin:0}
+    h1{font-size:clamp(46px,7vw,88px);max-width:900px;letter-spacing:-.045em}
+    .hero p{font-size:20px;max-width:760px;color:#475467;margin:22px 0 0}
+    .hero-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}
+    .pill{padding:8px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:13px;color:#475467}
+    .section{padding:46px 0}
+    .section-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:18px}
+    .section h2{font-size:36px;letter-spacing:-.03em}
+    .section-intro{color:var(--muted);max-width:650px;margin:8px 0 0}
+    .map-card{background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);overflow:hidden}
+    .map-top{display:flex;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid var(--line);background:#fcfdff;align-items:center;flex-wrap:wrap}
+    .date-pair{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+    .date-box{display:flex;flex-direction:column;gap:2px}
+    .date-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#98a2b3;font-weight:700}
+    .date-value{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:18px}
+    .legend{display:flex;gap:14px;align-items:center;font-size:12px;color:#667085}
+    .swatch{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}
+    .map-wrap{position:relative}
+    #map{display:none}
+    .satellite-stage{
+      position:relative;
+      width:100%;
+      aspect-ratio:1200/620;
+      min-height:420px;
+      background:#dfe6ec;
+      overflow:hidden;
+      border:1px solid #d9dee8;
+      isolation:isolate;
+    }
+    .satellite-stage img{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      display:block;
+      object-fit:cover;
+      object-position:center;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+    .satellite-stage .sat-base{z-index:1}
+    .satellite-stage .sat-compare{z-index:2;opacity:.7}
+    .satellite-frame{
+      position:absolute;
+      inset:12px;
+      z-index:6;
+      border:1px solid rgba(255,255,255,.78);
+      box-shadow:0 0 0 1px rgba(14,27,43,.20), inset 0 0 0 1px rgba(255,255,255,.25);
+      pointer-events:none;
+      border-radius:14px;
+    }
+    .sat-loading{
+      position:absolute;
+      inset:0;
+      z-index:5;
+      display:grid;
+      place-items:center;
+      background:rgba(245,247,251,.88);
+      color:#475467;
+      font-size:13px;
+      font-weight:600;
+      letter-spacing:.02em;
+      transition:opacity .2s ease;
+    }
+    .sat-loading.hidden{opacity:0;pointer-events:none}
+    .sat-error{
+      position:absolute;
+      left:16px;right:16px;bottom:16px;z-index:7;
+      display:none;
+      padding:10px 12px;
+      background:rgba(17,24,39,.92);color:#fff;border-radius:10px;font-size:12px;
+    }
+    .sat-error.show{display:block}
+    .compare-overlay{position:absolute;right:18px;top:18px;z-index:800;background:rgba(17,24,39,.90);color:white;border-radius:14px;padding:11px 13px;min-width:205px;backdrop-filter:blur(10px)}
+    .compare-overlay .small{font-size:11px;opacity:.70;text-transform:uppercase;letter-spacing:.1em}
+    .compare-overlay .big{font-weight:700;font-size:14px}
+    .slider-row{padding:15px 18px 18px;border-top:1px solid var(--line);background:#fff}
+    .slider-row label{display:flex;justify-content:space-between;font-size:13px;color:#667085;margin-bottom:8px}
+    input[type=range]{width:100%;accent-color:var(--cyan)}
+    .timeline{display:flex;gap:8px;overflow-x:auto;padding:16px 18px;border-top:1px solid var(--line);scrollbar-width:thin}
+    .time-btn{border:1px solid #d9dee8;background:#fff;border-radius:12px;padding:10px 14px;cursor:pointer;min-width:110px;text-align:left}
+    .time-btn strong{display:block;font-family:"Space Grotesk",sans-serif;font-size:16px}
+    .time-btn span{font-size:11px;color:#667085}
+    .time-btn.active{border-color:rgba(30,167,161,.65);background:#effcfb;box-shadow:inset 0 0 0 1px rgba(30,167,161,.15)}
+    .note{font-size:12px;color:#667085;margin:12px 18px 18px}
+    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .stat-card,.story-card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 8px 28px rgba(15,23,42,.05)}
+    .stat-card .label{font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:#98a2b3;font-weight:700}
+    .stat-card .number{font-family:"Space Grotesk",sans-serif;font-size:34px;font-weight:700;margin-top:7px}
+    .stat-card p{margin:6px 0 0;color:#667085;font-size:14px}
+    .story-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:18px}
+    .story-card h3{font-size:22px;margin-bottom:10px}
+    .story-card p{color:#667085;margin:0}
+    .callout{margin-top:14px;padding:14px 15px;border-radius:14px;background:#f7f9fb;border:1px dashed #d5dbe6;font-size:14px;color:#475467}
+    .data-strip{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px}
+    .data-item{background:var(--navy);color:#fff;border-radius:18px;padding:18px}
+    .data-item .label{font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:#98a2b3;font-weight:700}
+    .data-item .value{font-family:"Space Grotesk",sans-serif;font-size:20px;margin-top:5px}
+    .sources{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+    .source{padding:18px;border:1px solid var(--line);background:#fff;border-radius:16px}
+    .source a{text-decoration:none;font-weight:600}
+    .source .desc{font-size:13px;color:#667085;margin-top:4px}
+    footer{padding:38px 0 54px;color:#667085;font-size:12px}
+    .footer-row{display:flex;justify-content:space-between;gap:20px;align-items:center;border-top:1px solid var(--line);padding-top:18px}
+    @media (max-width: 820px){
+      .hero{padding-top:42px} .hero p{font-size:17px} .satellite-stage{min-height:300px}
+      .grid-3,.story-grid,.data-strip,.sources{grid-template-columns:1fr}
+      .section h2{font-size:30px}.wrap{padding:0 16px}.nav{padding-left:16px;padding-right:16px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav class="nav">
+      <a href="#top" class="brand"><span class="brand-dot"></span>Satellite Watch</a>
+      <span class="nav-tag">Student project · NASA data</span>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="wrap">
+        <div class="kicker">Earth observation · Central Asia</div>
+        <h1>The Aral Sea, watched from space.</h1>
+        <p>Drag the timeline and fade between dates to see how one of the world’s most dramatic environmental changes appears in real satellite imagery.</p>
+        <div class="hero-meta">
+          <span class="pill">Issue: surface-water loss</span>
+          <span class="pill">Instrument: MODIS on NASA Terra</span>
+          <span class="pill">Imagery: 250 m · daily</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="section-head">
+          <div>
+            <div class="kicker">01 · Explore the change</div>
+            <h2>One place. Five moments.</h2>
+            <p class="section-intro">The map below requests the imagery directly from NASA’s Global Imagery Browse Services (GIBS). Use the timeline to switch the reference date, then fade the newer image over it.</p>
+          </div>
+        </div>
+
+        <div class="map-card">
+          <div class="map-top">
+            <div class="date-pair">
+              <div class="date-box"><span class="date-label">Reference</span><span class="date-value" id="beforeDate">25 Aug 2000</span></div>
+              <div style="color:#98a2b3">→</div>
+              <div class="date-box"><span class="date-label">Compare</span><span class="date-value" id="afterDate">19 Aug 2014</span></div>
+            </div>
+            <div class="legend">
+              <span><i class="swatch" style="background:#183b56"></i>water</span>
+              <span><i class="swatch" style="background:#b79d71"></i>exposed lakebed</span>
+              <span><i class="swatch" style="background:#6c8d61"></i>vegetation</span>
+            </div>
+          </div>
+
+          <div class="map-wrap">
+            <div class="satellite-stage" aria-label="NASA MODIS satellite imagery of the Aral Sea">
+              <img id="baseImage" class="sat-base" alt="NASA MODIS Terra satellite image of the Aral Sea in the reference year" decoding="async" />
+              <img id="compareImage" class="sat-compare" alt="NASA MODIS Terra satellite image of the Aral Sea in the selected comparison year" decoding="async" />
+              <div class="satellite-frame"></div>
+              <div class="sat-loading" id="satLoading">Loading NASA satellite imagery…</div>
+              <div class="sat-error" id="satError">NASA imagery could not be loaded. Check your internet connection and refresh the page.</div>
+              <div class="compare-overlay">
+                <div class="small">NASA GIBS</div>
+                <div class="big">MODIS Terra · True Color</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="slider-row">
+            <label><span>Fade the comparison layer</span><strong id="opacityValue">70%</strong></label>
+            <input id="opacitySlider" type="range" min="0" max="100" value="70" aria-label="Comparison layer opacity" />
+          </div>
+
+          <div class="timeline" id="timeline"></div>
+          <div class="note">Tip: choose a date, then move the fade slider toward 0% to reveal the earlier scene or toward 100% to emphasize the selected scene.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" style="padding-top:18px">
+      <div class="wrap">
+        <div class="grid-3">
+          <article class="stat-card"><div class="label">Series begins</div><div class="number">2000</div><p>NASA’s Terra MODIS time series starts with the lake already far smaller than its historical extent.</p></article>
+          <article class="stat-card"><div class="label">Milestone</div><div class="number">2014</div><p>NASA reported that the eastern basin of the South Aral Sea completely dried that summer.</p></article>
+          <article class="stat-card"><div class="label">What to look for</div><div class="number">Water → land</div><p>Dark water retreats while pale, exposed lakebed expands across the former shoreline.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="kicker">02 · Read the story</div>
+        <div class="story-grid">
+          <article class="story-card">
+            <h3>What changed?</h3>
+            <p>Satellite images show the Aral Sea breaking into smaller water bodies and the southern lake losing large areas of open water. NASA’s long-running “World of Change” series documents the retreat from 2000 onward.</p>
+            <div class="callout"><strong>Key visual cue:</strong> compare the broad dark-blue shapes in 2000 with the much smaller water footprint later in the sequence.</div>
+          </article>
+          <article class="story-card">
+            <h3>Why did it happen?</h3>
+            <p>NASA Earth Observatory attributes the long-term decline to major diversions of the Amu Darya and Syr Darya for irrigation beginning in the Soviet era. The flow reaching the lake dropped sharply, so the inland sea could no longer maintain its former size.</p>
+            <div class="callout"><strong>Important nuance:</strong> the North Aral has followed a different trajectory since the Kok-Aral dam was completed in 2005.</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="kicker">03 · Why it matters</div>
+        <div class="grid-3">
+          <article class="story-card"><h3>Ecology</h3><p>As the lake shrank and salinity rose, fish populations and the fishing economy were severely disrupted.</p></article>
+          <article class="story-card"><h3>Dust & soil</h3><p>Exposed lakebed can release salty dust, and NASA reports that these particles have affected air quality and agricultural soils.</p></article>
+          <article class="story-card"><h3>Climate</h3><p>NASA notes that losing a huge inland water body changed the local climate, with colder winters and hotter, drier summers.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="kicker">04 · The data</div>
+        <div class="data-strip">
+          <div class="data-item"><div class="label">Satellite</div><div class="value">Terra · MODIS</div></div>
+          <div class="data-item"><div class="label">NASA service</div><div class="value">GIBS · WMS</div></div>
+          <div class="data-item"><div class="label">Image type</div><div class="value">True color · 250 m</div></div>
+        </div>
+        <p class="section-intro" style="margin-top:14px">MODIS true-color imagery is designed to look similar to natural color. NASA’s metadata notes a 250 m imagery resolution and daily temporal coverage for this corrected-reflectance product.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="wrap">
+        <div class="kicker">05 · Sources</div>
+        <div class="sources">
+          <div class="source"><a target="_blank" rel="noopener" href="https://science.nasa.gov/earth/earth-observatory/world-of-change/aral-sea/">NASA Earth Observatory · World of Change: Shrinking Aral Sea ↗</a><div class="desc">NASA’s year-by-year MODIS story, including historical context and the 2014 eastern-lobe milestone.</div></div>
+          <div class="source"><a target="_blank" rel="noopener" href="https://nasa-gibs.github.io/gibs-api-docs/">NASA GIBS API documentation ↗</a><div class="desc">Documentation for serving NASA Earth imagery through web mapping services.</div></div>
+          <div class="source"><a target="_blank" rel="noopener" href="https://github.com/nasa-gibs/worldview-options-eosdis/blob/master/common/config/metadata/modis/CorrectedReflectance.md">NASA MODIS corrected-reflectance metadata ↗</a><div class="desc">Product definition, sensor resolution, daily coverage, and band information.</div></div>
+          <div class="source"><a target="_blank" rel="noopener" href="https://science.nasa.gov/earth/earth-observatory/the-aral-sea-loses-its-eastern-lobe-84437/">NASA · The Aral Sea Loses Its Eastern Lobe ↗</a><div class="desc">NASA’s detailed 2014 comparison and explanation of the eastern basin drying.</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap footer-row">
+      <div>Satellite Watch · Interactive school project</div>
+      <div>Imagery is delivered from NASA GIBS when this page is opened. Not an official NASA website.</div>
+    </div>
+  </footer>
+
+  <script>
+    const DATES = [
+      { year: 2000, date: '2000-08-25', label: '25 Aug', note: 'Series baseline' },
+      { year: 2005, date: '2005-08-16', label: '16 Aug', note: 'After Kok-Aral dam' },
+      { year: 2010, date: '2010-08-26', label: '26 Aug', note: 'Temporary recovery' },
+      { year: 2014, date: '2014-08-19', label: '19 Aug', note: 'Eastern lobe dries' },
+      { year: 2018, date: '2018-08-21', label: '21 Aug', note: 'Later snapshot' }
+    ];
+
+    const BBOX = [56.0, 40.8, 62.8, 47.6];
+    const IMAGE_W = 1200;
+    const IMAGE_H = 620;
+    const NASA_WMS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi';
+
+    let beforeIndex = 0;
+    let afterIndex = 3;
+
+    const baseImage = document.getElementById('baseImage');
+    const compareImage = document.getElementById('compareImage');
+    const loading = document.getElementById('satLoading');
+    const errorBox = document.getElementById('satError');
+
+    function nasaImageUrl(date){
+      const params = new URLSearchParams({
+        service: 'WMS',
+        request: 'GetMap',
+        version: '1.1.1',
+        layers: 'MODIS_Terra_CorrectedReflectance_TrueColor',
+        styles: '',
+        srs: 'EPSG:4326',
+        bbox: BBOX.join(','),
+        width: String(IMAGE_W),
+        height: String(IMAGE_H),
+        format: 'image/jpeg',
+        transparent: 'false',
+        time: date
+      });
+      return NASA_WMS + '?' + params.toString();
+    }
+
+    function primeImage(img, url){
+      return new Promise((resolve, reject) => {
+        const test = new Image();
+        test.decoding = 'async';
+        test.onload = () => { img.src = url; resolve(); };
+        test.onerror = reject;
+        test.src = url;
+      });
+    }
+
+    async function setImages(baseDate, compareDate){
+      loading.classList.remove('hidden');
+      errorBox.classList.remove('show');
+      try {
+        const [baseOk, compareOk] = await Promise.allSettled([
+          primeImage(baseImage, nasaImageUrl(baseDate)),
+          primeImage(compareImage, nasaImageUrl(compareDate))
+        ]);
+        if (baseOk.status === 'rejected' || compareOk.status === 'rejected') throw new Error('NASA image request failed');
+        compareImage.style.opacity = (document.getElementById('opacitySlider').value / 100).toString();
+        loading.classList.add('hidden');
+      } catch (err) {
+        loading.classList.add('hidden');
+        errorBox.classList.add('show');
+      }
+    }
+    // The satellite image itself is a single NASA WMS render, not a stack of map tiles.
+    // This keeps the imagery aligned perfectly inside the framed viewport.
+    function fmt(d){
+      const [y,m,day] = d.split('-');
+      const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${day} ${names[+m-1]} ${y}`;
+    }
+
+    function renderTimeline(){
+      const root = document.getElementById('timeline');
+      root.innerHTML = '';
+      DATES.forEach((d,i)=>{
+        const btn=document.createElement('button');
+        btn.className='time-btn'+(i===afterIndex?' active':'');
+        btn.innerHTML=`<strong>${d.year}</strong><span>${d.label} · ${d.note}</span>`;
+        btn.title='Use this year as the comparison scene';
+        btn.addEventListener('click', ()=>{ setAfter(i); });
+        root.appendChild(btn);
+      });
+    }
+
+    async function setAfter(index){
+      afterIndex = index;
+      document.getElementById('afterDate').textContent = fmt(DATES[index].date);
+      renderTimeline();
+      await setImages(DATES[beforeIndex].date, DATES[afterIndex].date);
+    }
+
+    async function setBefore(index){
+      beforeIndex = index;
+      document.getElementById('beforeDate').textContent = fmt(DATES[index].date);
+      await setImages(DATES[beforeIndex].date, DATES[afterIndex].date);
+    }
+
+    renderTimeline();
+    document.getElementById('opacitySlider').addEventListener('input',(e)=>{
+      const v=Number(e.target.value)/100;
+      compareImage.style.opacity=v.toString();
+      document.getElementById('opacityValue').textContent=e.target.value+'%';
+    });
+
+    // Load a complete, aligned image pair before removing the loading veil.
+    setImages(DATES[beforeIndex].date, DATES[afterIndex].date);
+  </script>
+</body>
+</html>
